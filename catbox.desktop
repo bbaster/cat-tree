@@ -1,0 +1,11 @@
+#KDE Plasma service menu file, to be put in ~/.local/share/kio/servicemenus/
+[Desktop Entry]
+Type=Service
+MimeType=application/octet-stream
+Actions=catboxUpload
+
+[Desktop Action catboxUpload]
+Name=Upload to Catbox
+Icon=cloud-upload
+TryExec=~/catbox-uploader/main.py
+Exec=~/catbox-uploader/main.py %f
