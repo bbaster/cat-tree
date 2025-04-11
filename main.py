@@ -102,7 +102,7 @@ def upload(filepath: str) -> string:
     filepath = Path(filepath)
     
     headers = {
-        'User-Agent': f'catbox-uploader/1.0 (Python {platform.python_version()}; {platform.system()} {platform.release()})',
+        'User-Agent': f'cat-tree/1.0 (Python {platform.python_version()}; {platform.system()} {platform.release()}) +https://github.com/bbaster/cat-tree',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en',
         'DNT': '1',
