@@ -23,30 +23,78 @@ import string
 import random
 import sys
 import os
+import subprocess
+import importlib.util
 from pathlib import Path
 from dotenv import load_dotenv
 from plyer import notification
+from shutil import which
 
 load_dotenv()
 userhash = os.getenv("USERHASH")
 
-def inform(url: str):
-    if re.search(r"^(https?://)?files.catbox.moe/\w{6}.\w+$", url):
-        print(url)
-        notification.notify(
-            title="Successfully uploaded to Catbox",
-            message=url,
-            timeout=10
-        )
+
+def check_environment() -> str:
+    #Check for Android
+    if hasattr(sys, 'getandroidapilevel'):
+        #Check for Termux
+        if which('termux-setup-storage'):
+            #Check for Termux API
+            if which('termux-notification'):
+                return "android-termux-api"
+            else:
+                return "android-termux-noapi"
+        else:
+            return "android"
     else:
-        print("Upload to Catbox unsuccessful", file=sys.stderr)
-        notification.notify(
-            title="Upload to Catbox unsuccessful",
-            message="",
+        return "other"
+
+
+def notify(title: str, message: str, timeout: int = 10):
+    environment = check_environment()
+    if environment in {'android', 'other'}:
+        try:
+            if environment == 'android' and not importlib.util.find_spec('jnius'):
+                raise ModuleNotFoundError
+            notification.notify(
+                title=title,
+                message=message,
+                timeout=timeout
+            )
+        except (NotImplementedError, ModuleNotFoundError):
+            print("Error: Notifications unavailable!", file=sys.stderr)
+    elif environment == 'android-termux-api':
+        #termux-notification --sound -t 'tbh creature' -c 'Hello world!~ .' --button1 Copy --button1-action "termux-toast hello"
+        proc = subprocess.run([
+                "termux-notification", "--sound",
+                "-t", title,
+                "-c", message,
+                "--button1", "Copy",
+                "--button1-action", f"termux-clipboard-set {message}"
+            ])
+        #print(f"Command line: {r'"' + '" "'.join(proc.args) + r'"'}")
+    else:
+        print("Error: Notifications unavailable!", file=sys.stderr)
+
+
+def inform(server_response: str):
+    if re.search(r"^(https?://)?files.catbox.moe/\w{6}(\.\w+)?$", server_response):
+        print(server_response)
+        notify(
+                title="Successfully uploaded to Catbox",
+                message=server_response,
+                timeout=10
+              )
+    else:
+        print("Error: Upload to Catbox unsuccessful", file=sys.stderr)
+        print(f"Server response: {server_response}", file=sys.stderr)
+        notify(
+                title="Error: Upload to Catbox unsuccessful",
+            message=f"Server response: {server_response}",
             timeout=10
         )
         exit(1)
-    
+
 
 def upload(filepath: str) -> string:
 
@@ -100,20 +148,26 @@ def upload(filepath: str) -> string:
 
     filename = filepath.parts[-1]
 
-
     data = f'''{form_boundary}
 Content-Disposition: form-data; name="reqtype"
 
 fileupload
 {form_boundary}
-Content-Disposition: form-data; name="userhash"
+'''
+
+    if userhash:
+        data += '''Content-Disposition: form-data; name="userhash"
 
 {userhash}
 {form_boundary}
-Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"
-Content-Type: application/octet-stream
+'''
 
-'''.encode("utf-8") + contents + f"\n{form_boundary}\n".encode("utf-8")
+    data += '''Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"
+Content-Type: application/octet-stream           
+
+'''
+
+    data = data.encode("utf-8") + contents + f"\n{form_boundary}\n".encode("utf-8")
 
     response_api = requests.post('https://catbox.moe/user/api.php', cookies=cookies, headers=headers, data=data)
     return response_api.text
