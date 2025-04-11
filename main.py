@@ -64,7 +64,6 @@ def notify(title: str, message: str, timeout: int = 10):
         except (NotImplementedError, ModuleNotFoundError):
             print("Error: Notifications unavailable!", file=sys.stderr)
     elif environment == 'android-termux-api':
-        #termux-notification --sound -t 'tbh creature' -c 'Hello world!~ .' --button1 Copy --button1-action "termux-toast hello"
         proc = subprocess.run([
                 "termux-notification", "--sound",
                 "-t", title,
@@ -72,7 +71,6 @@ def notify(title: str, message: str, timeout: int = 10):
                 "--button1", "Copy",
                 "--button1-action", f"termux-clipboard-set {message}"
             ])
-        #print(f"Command line: {r'"' + '" "'.join(proc.args) + r'"'}")
     else:
         print("Error: Notifications unavailable!", file=sys.stderr)
 
