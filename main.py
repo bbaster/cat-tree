@@ -25,10 +25,13 @@ import sys
 import os
 import subprocess
 import importlib.util
+import platform
+
 from pathlib import Path
 from dotenv import load_dotenv
 from plyer import notification
 from shutil import which
+
 
 load_dotenv()
 userhash = os.getenv("USERHASH")
@@ -99,7 +102,7 @@ def upload(filepath: str) -> string:
     filepath = Path(filepath)
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0',
+        'User-Agent': f'catbox-uploader/1.0 (Python {platform.python_version()}; {platform.system()} {platform.release()})',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en',
         'DNT': '1',
