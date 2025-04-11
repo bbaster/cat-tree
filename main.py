@@ -154,13 +154,13 @@ fileupload
 '''
 
     if userhash:
-        data += '''Content-Disposition: form-data; name="userhash"
+        data += f'''Content-Disposition: form-data; name="userhash"
 
 {userhash}
 {form_boundary}
 '''
 
-    data += '''Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"
+    data += f'''Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"
 Content-Type: application/octet-stream           
 
 '''
