@@ -79,7 +79,7 @@ def notify(title: str, message: str, timeout: int = 10):
 
 
 def inform(server_response: str):
-    if re.search(r"^(https?://)?files.catbox.moe/\w{6}(\.\w+)?$", server_response):
+    if re.search(r"^(https?://)?files\.catbox\.moe/\w{6}(\.\w+)?$", server_response):
         print(server_response)
         notify(
                 title="Successfully uploaded to Catbox",
