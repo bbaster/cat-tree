@@ -32,17 +32,16 @@ from dotenv import load_dotenv
 from plyer import notification
 from shutil import which
 
-
 load_dotenv()
 userhash = os.getenv("USERHASH")
 
 
 def check_environment() -> str:
-    #Check for Android
+    # Check for Android
     if hasattr(sys, 'getandroidapilevel'):
-        #Check for Termux
+        # Check for Termux
         if which('termux-setup-storage'):
-            #Check for Termux API
+            # Check for Termux API
             if which('termux-notification'):
                 return "android-termux-api"
             else:
@@ -52,16 +51,18 @@ def check_environment() -> str:
     else:
         return "other"
 
+
 def error(title: str, message: str = '', fatal: bool = True, notification: bool = True):
     if notification:
         notify(
-               title=title,
-               message=message,
-               timeout=10
-              )
+            title=title,
+            message=message,
+            timeout=10
+        )
     print("Error: ", title, f"{'\n' if message else ''}", message, file=sys.stderr, sep='')
     if fatal:
         exit(1)
+
 
 def notify(title: str, message: str = '', timeout: int = 10):
     environment = check_environment()
@@ -78,42 +79,50 @@ def notify(title: str, message: str = '', timeout: int = 10):
             error(title="Error: Notifications unavailable!", fatal=False, notification=False)
     elif environment == 'android-termux-api':
         subprocess.run([
-                "termux-notification", "--sound",
-                "-t", title,
-                "-c", message,
-                "--button1", "Copy",
-                "--button1-action", f"termux-clipboard-set {message}"
-            ])
+            "termux-notification", "--sound",
+            "-t", title,
+            "-c", message,
+            "--button1", "Copy",
+            "--button1-action", f"termux-clipboard-set {message}"
+        ])
     else:
         print("Error: Notifications unavailable!", file=sys.stderr)
 
 
-def inform(server_response: str):
-
+def inform(server_response: str, litterbox: bool = False):
     print("Debug: inform() function entered")
 
-    service_name = 'Catbox'
+    if litterbox:
+        service_name = 'Litterbox'
+    else:
+        service_name = 'Catbox'
     if re.search(r"^(https?://)?(files|litterbox)\.catbox\.moe/\w{6}(\.\w+)?$", server_response):
         print(server_response)
         notify(
-                title=f"Successfully uploaded to {service_name}",
-                message=server_response,
-                timeout=10
-              )
+            title=f"Successfully uploaded to {service_name}",
+            message=server_response,
+            timeout=10
+        )
     else:
         error(
-              title = f"Error: Upload to {service_name} unsuccessful",
-              message = f"Server response: {server_response}",
-              fatal = True
-             )
+            title=f"Error: Upload to {service_name} unsuccessful",
+            message=f"Server response: {server_response}",
+            fatal=True
+        )
 
-def upload(filepath: str | Path) -> str:
 
+def upload(filepath: str | Path, litterbox: bool = 0, expire_hours: int = 0) -> str:
     print("Debug: upload() function entered")
+
+    if expire_hours not in {0, 1, 12, 24, 72}:
+        error("Error: Invalid expiration time \"{expire_hours}\"")
 
     filepath = Path(filepath)
 
-    url_root = "https://catbox.moe"
+    if litterbox:
+        url_root = "https://litterbox.catbox.moe"
+    else:
+        url_root = "https://catbox.moe"
 
     headers = {
         'User-Agent': f'cat-tree/1.0 (Python {platform.python_version()}; {platform.system()} {platform.release()}) +https://github.com/bbaster/cat-tree',
@@ -126,12 +135,12 @@ def upload(filepath: str | Path) -> str:
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1', 
+        'Sec-Fetch-User': '?1',
         'Priority': 'u=0, i',
         'Pragma': 'no-cache',
         'Cache-Control': 'no-cache',
     }
-    
+
     response_root = requests.get(url_root, headers=headers)
     cookie = response_root.headers['Set-Cookie']
     regex = re.search(r"PHPSESSID=([0-9a-z]+);", cookie)
@@ -145,8 +154,7 @@ def upload(filepath: str | Path) -> str:
     for _ in range(32):
         form_boundary_id += random.choice(string.hexdigits[:16])
     form_boundary = "------geckoformboundary" + form_boundary_id
-    
-    
+
     headers.update({
         'Accept': 'application/json',
         'Referer': f'{url_root}',
@@ -160,7 +168,7 @@ def upload(filepath: str | Path) -> str:
 
     headers.pop('Sec-Fetch-User')
     headers.pop('Priority')
-    
+
     try:
         with filepath.open('rb') as file:
             contents = file.read()
@@ -171,8 +179,18 @@ def upload(filepath: str | Path) -> str:
 
     filename = filepath.parts[-1]
 
+    if expire_hours:
+        data = f'''
+{form_boundary}
+Content-Disposition: form-data; name="time"
 
-    data = f'''{form_boundary}
+{expire_hours}h
+{form_boundary}
+'''
+    else:
+        data = ''''''
+
+    data += f'''{form_boundary}
 Content-Disposition: form-data; name="reqtype"
 
 fileupload
@@ -193,19 +211,35 @@ Content-Type: application/octet-stream
 
     data = data.encode("utf-8") + contents + f"\n{form_boundary}\n".encode("utf-8")
 
-    response_api = requests.post(f'{url_root}/user/api.php', cookies=cookies, headers=headers, data=data)
+    response_api = requests.post(f'{url_root}/{"resources/internals" if litterbox else "user"}/api.php',
+                                 cookies=cookies, headers=headers, data=data)
     return response_api.text
 
 
-
 def main():
+    litterbox = input("Do you want to upload to Litterbox? (y/N): ")
+    litterbox = True if litterbox.lower() in ('y', 'yes') else False
+    if litterbox:
+        expire_hours = input("Expiration time in hours: ")
+        if expire_hours == '':
+            expire_hours = 0
+        try:
+            expire_hours = int(expire_hours)
+        except ValueError:
+            error(f"Error: Invalid expiration time \"{expire_hours}\"")
+    else:
+        expire_hours = 0
+
+    if expire_hours not in {0, 1, 12, 24, 48}:
+        error(f"Error: Invalid expiration time \"{expire_hours}\"")
+
     if not sys.argv[1:]:
         filepath = Path(input("Input a file path: "))
-        inform(upload(filepath=filepath))
+        inform(upload(filepath=filepath, litterbox=litterbox, expire_hours=expire_hours), litterbox=litterbox)
 
     else:
-      for filepath in sys.argv[1:]:
-          inform(upload(filepath=filepath))
+        for filepath in sys.argv[1:]:
+            inform(upload(filepath=filepath, litterbox=litterbox, expire_hours=expire_hours), litterbox=litterbox)
 
 
 if __name__ == '__main__':
