@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-'''
+"""
 Copyright (C) 2025 bbaster
 
 This program is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-'''
+"""
 
 import requests
 import re
@@ -52,8 +52,18 @@ def check_environment() -> str:
     else:
         return "other"
 
+def error(title: str, message: str = '', fatal: bool = True, notification: bool = True):
+    if notification:
+        notify(
+               title=title,
+               message=message,
+               timeout=10
+              )
+    print("Error: ", title, f"{'\n' if message else ''}", message, file=sys.stderr, sep='')
+    if fatal:
+        exit(1)
 
-def notify(title: str, message: str, timeout: int = 10):
+def notify(title: str, message: str = '', timeout: int = 10):
     environment = check_environment()
     if environment in {'android', 'other'}:
         try:
@@ -65,9 +75,9 @@ def notify(title: str, message: str, timeout: int = 10):
                 timeout=timeout
             )
         except (NotImplementedError, ModuleNotFoundError):
-            print("Error: Notifications unavailable!", file=sys.stderr)
+            error(title="Error: Notifications unavailable!", fatal=False, notification=False)
     elif environment == 'android-termux-api':
-        proc = subprocess.run([
+        subprocess.run([
                 "termux-notification", "--sound",
                 "-t", title,
                 "-c", message,
@@ -79,28 +89,32 @@ def notify(title: str, message: str, timeout: int = 10):
 
 
 def inform(server_response: str):
-    if re.search(r"^(https?://)?files\.catbox\.moe/\w{6}(\.\w+)?$", server_response):
+
+    print("Debug: inform() function entered")
+
+    service_name = 'Catbox'
+    if re.search(r"^(https?://)?(files|litterbox)\.catbox\.moe/\w{6}(\.\w+)?$", server_response):
         print(server_response)
         notify(
-                title="Successfully uploaded to Catbox",
+                title=f"Successfully uploaded to {service_name}",
                 message=server_response,
                 timeout=10
               )
     else:
-        print("Error: Upload to Catbox unsuccessful", file=sys.stderr)
-        print(f"Server response: {server_response}", file=sys.stderr)
-        notify(
-                title="Error: Upload to Catbox unsuccessful",
-            message=f"Server response: {server_response}",
-            timeout=10
-        )
-        exit(1)
+        error(
+              title = f"Error: Upload to {service_name} unsuccessful",
+              message = f"Server response: {server_response}",
+              fatal = True
+             )
 
+def upload(filepath: str | Path) -> str:
 
-def upload(filepath: str) -> string:
+    print("Debug: upload() function entered")
 
     filepath = Path(filepath)
-    
+
+    url_root = "https://catbox.moe"
+
     headers = {
         'User-Agent': f'cat-tree/1.0 (Python {platform.python_version()}; {platform.system()} {platform.release()}) +https://github.com/bbaster/cat-tree',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -118,10 +132,14 @@ def upload(filepath: str) -> string:
         'Cache-Control': 'no-cache',
     }
     
-    response_root = requests.get('https://catbox.moe/', headers=headers)
+    response_root = requests.get(url_root, headers=headers)
     cookie = response_root.headers['Set-Cookie']
-    regex = re.search(r"^PHPSESSID=([0-9a-f]{32}); path=/$", cookie)
-    cookies = {'PHPSESSID': regex.group(1)}
+    regex = re.search(r"PHPSESSID=([0-9a-z]+);", cookie)
+
+    try:
+        cookies = {'PHPSESSID': regex.group(1)}
+    except AttributeError:
+        error(f"Error: No PHPSESSID cookie found in {cookie}")
 
     form_boundary_id = ''
     for _ in range(32):
@@ -131,10 +149,10 @@ def upload(filepath: str) -> string:
     
     headers.update({
         'Accept': 'application/json',
-        'Referer': 'https://catbox.moe/',
+        'Referer': f'{url_root}',
         'X-Requested-With': 'XMLHttpRequest',
         'Content-Type': f'multipart/form-data; boundary={form_boundary[2:]}',
-        'Origin': 'https://catbox.moe',
+        'Origin': f'{url_root}',
         'Sec-Fetch-Dest': 'empty',
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Site': 'same-origin',
@@ -143,11 +161,16 @@ def upload(filepath: str) -> string:
     headers.pop('Sec-Fetch-User')
     headers.pop('Priority')
     
-    
-    with filepath.open('rb') as file:
-        contents = file.read()
+    try:
+        with filepath.open('rb') as file:
+            contents = file.read()
+    except FileNotFoundError:
+        error(f"Error: File \"{str(filepath)}\" not found", fatal=True)
+    except IsADirectoryError:
+        error(f"Error: \"{str(filepath)}\" is a directory", fatal=True)
 
     filename = filepath.parts[-1]
+
 
     data = f'''{form_boundary}
 Content-Disposition: form-data; name="reqtype"
@@ -170,14 +193,20 @@ Content-Type: application/octet-stream
 
     data = data.encode("utf-8") + contents + f"\n{form_boundary}\n".encode("utf-8")
 
-    response_api = requests.post('https://catbox.moe/user/api.php', cookies=cookies, headers=headers, data=data)
+    response_api = requests.post(f'{url_root}/user/api.php', cookies=cookies, headers=headers, data=data)
     return response_api.text
 
 
-if not sys.argv[1:]:
-    filepath = Path(input("Input a file path: "))
-    inform(upload(filepath))
 
-else:
-    for filepath in sys.argv[1:]:
-        inform(upload(filepath))
+def main():
+    if not sys.argv[1:]:
+        filepath = Path(input("Input a file path: "))
+        inform(upload(filepath=filepath))
+
+    else:
+      for filepath in sys.argv[1:]:
+          inform(upload(filepath=filepath))
+
+
+if __name__ == '__main__':
+    main()
