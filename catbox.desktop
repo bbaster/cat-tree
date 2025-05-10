@@ -7,5 +7,5 @@ Actions=catboxUpload
 [Desktop Action catboxUpload]
 Name=Upload to Catbox
 Icon=cloud-upload
-TryExec=~/cat-tree/main.py
-Exec=~/cat-tree/main.py %f
+TryExec=~/cat-tree/main.py --non-interactive
+Exec=~/cat-tree/main.py --non-interactive %f

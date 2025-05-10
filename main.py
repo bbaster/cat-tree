@@ -209,4 +209,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Non-interactive mode
+
+    if sys.argv[1] == '--non-interactive':
+        for filepath in sys.argv[2:]:
+            inform(upload(filepath=filepath, litterbox=False, expire_hours=0), litterbox=False)
+    else:
+        main()
