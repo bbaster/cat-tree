@@ -93,7 +93,7 @@ def inform(server_response: str):
     print("Debug: inform() function entered")
 
     service_name = 'Catbox'
-    if re.search(r"^(https?://)?(files|litterbox)\.catbox\.moe/\w{6}(\.\w+)?$", server_response):
+    if re.search(r"^(https?://)?files\.catbox\.moe/\w{6}(\.\w+)?$", server_response):
         print(server_response)
         notify(
                 title=f"Successfully uploaded to {service_name}",
@@ -213,6 +213,6 @@ if __name__ == '__main__':
 
     if sys.argv[1] == '--non-interactive':
         for filepath in sys.argv[2:]:
-            inform(upload(filepath=filepath, litterbox=False, expire_hours=0), litterbox=False)
+            inform(upload(filepath=filepath))
     else:
         main()
